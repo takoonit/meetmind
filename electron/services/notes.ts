@@ -2,7 +2,7 @@ import type { Config, LLMProvider, Notes, TranscriptSegment } from '../shared';
 import * as logger from '../providers/shared/log';
 import { llmRegistry } from '../providers';
 import { errorMessage } from '../utils/errors';
-import { DEFAULT_SYSTEM_PROMPT, DEFAULT_MD_SYSTEM_PROMPT } from './prompts';
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_MD_SYSTEM_PROMPT, GROK_SYSTEM_PROMPT } from './prompts';
 import { transcriptToText, isMarkdownPrompt, buildUserPrompt, parseNotesResponse, buildNotesPreview, estimateNotesProgress } from './notes-normalize';
 import { applyMeetingTitle } from './meeting-title';
 
@@ -13,6 +13,8 @@ const PREVIEW_INTERVAL_MS = 100;
 function resolveSystemPrompt(config: Partial<Config>) {
   const custom = config.geminiSystemPrompt || config.systemPrompt || '';
   if (custom.trim()) return custom;
+  // Grok gets a sharper prompt by default
+  if (config.llmProvider === 'grok') return GROK_SYSTEM_PROMPT;
   return config.noteOutputMode === 'markdown' ? DEFAULT_MD_SYSTEM_PROMPT : DEFAULT_SYSTEM_PROMPT;
 }
 
@@ -86,12 +88,14 @@ function createPreviewStream({
       progress: estimateNotesProgress(text.length, transcriptChars),
     });
   };
+  const onText = (delta: string) => {
+    text += delta;
+    if (timer) return;
+    const wait = Math.max(0, PREVIEW_INTERVAL_MS - (Date.now() - last));
+    timer = setTimeout(flush, wait);
+  };
   return {
-    onText(delta: string) {
-      text += delta;
-      if (timer) return;
-      timer = setTimeout(flush, Math.max(0, PREVIEW_INTERVAL_MS - (Date.now() - last)));
-    },
+    onText,
     stop() {
       if (timer) clearTimeout(timer);
       timer = null;
@@ -101,11 +105,11 @@ function createPreviewStream({
 
 /**
  * Generate notes for a transcript with the configured LLM, retrying once with
- * the fallback provider/model if the primary fails. `meetingTitle` (already
- * checked by sourceMeetingTitle) is a prompt hint and wins over the LLM's title.
+ * the fallback provider if the primary fails.
+ *
  * `onPreview({ attempt, provider, model, notes, progress })`, if given, receives
  * the notes streamed so far and an estimate of how much is written; `notes: null`
- * starts each attempt with a clean preview.
+ * starts a new attempt.
  *
  * Returns { notes, provider, model, fallback } where `fallback` is
  * { primary: {provider, model}, error } when the fallback produced the notes.
