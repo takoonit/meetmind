@@ -13,13 +13,14 @@ import groqStt from './stt/groq';
 import gemini from './llm/gemini';
 import groqLlm from './llm/groq';
 import claude from './llm/claude';
+import grok from './llm/grok';
 
 const sttRegistry: Registry<STTProvider> = createRegistry<STTProvider>('stt', ['transcribe', 'test']);
 const llmRegistry: Registry<LLMProvider> = createRegistry<LLMProvider>('llm', ['generate', 'test']);
 
 [google, sarvam, assemblyai, groqStt].forEach((p) => sttRegistry.register(p));
 
-[gemini, groqLlm, claude].forEach((p) => llmRegistry.register(p));
+[gemini, groqLlm, claude, grok].forEach((p) => llmRegistry.register(p));
 
 const registries: Record<ProviderKind, Registry<STTProvider | LLMProvider>> = { stt: sttRegistry, llm: llmRegistry };
 

@@ -22,6 +22,7 @@ export interface ProviderConfigFields {
   geminiApiKey: string;
   claudeApiKey: string;
   groqApiKey: string;
+  xaiApiKey: string;
   sarvamApiKey: string;
   assemblyAiApiKey: string;
   assemblyAiPrompt: string;
